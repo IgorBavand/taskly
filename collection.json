@@ -1,0 +1,77 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-03-31T00:00:00.000Z",
+  "__export_source": "chatgpt",
+  "resources": [
+    {
+      "_id": "req_list_todos",
+      "_type": "request",
+      "parentId": "fld_todos",
+      "name": "List Todos",
+      "method": "GET",
+      "url": "http://localhost:7070/todos",
+      "headers": [],
+      "body": {}
+    },
+    {
+      "_id": "req_get_todo",
+      "_type": "request",
+      "parentId": "fld_todos",
+      "name": "Get Todo by ID",
+      "method": "GET",
+      "url": "http://localhost:7070/todos/1",
+      "headers": [],
+      "body": {}
+    },
+    {
+      "_id": "req_create_todo",
+      "_type": "request",
+      "parentId": "fld_todos",
+      "name": "Create Todo",
+      "method": "POST",
+      "url": "http://localhost:7070/todos",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"Estudar Javalin com Kotlin\"\n}"
+      }
+    },
+    {
+      "_id": "req_toggle_todo",
+      "_type": "request",
+      "parentId": "fld_todos",
+      "name": "Toggle Todo",
+      "method": "PATCH",
+      "url": "http://localhost:7070/todos/1/toggle",
+      "headers": [],
+      "body": {}
+    },
+    {
+      "_id": "req_delete_todo",
+      "_type": "request",
+      "parentId": "fld_todos",
+      "name": "Delete Todo",
+      "method": "DELETE",
+      "url": "http://localhost:7070/todos/1",
+      "headers": [],
+      "body": {}
+    },
+    {
+      "_id": "fld_todos",
+      "_type": "request_group",
+      "parentId": "wrk_javalin_todo",
+      "name": "Todos API"
+    },
+    {
+      "_id": "wrk_javalin_todo",
+      "_type": "workspace",
+      "name": "Javalin Todo API"
+    }
+  ]
+}

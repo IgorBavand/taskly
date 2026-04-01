@@ -1,6 +1,6 @@
 package app.repository
 
-import app.model.Todo
+import app.domain.entity.Todo
 import java.time.LocalDateTime
 import javax.sql.DataSource
 
@@ -17,6 +17,7 @@ class TodoRepository(private val dataSource: DataSource) {
             todos.add(
                 Todo(
                     rs.getLong("id"),
+                    rs.getLong("id"), // userId (for simplicity, using id as userId here)
                     rs.getString("title"),
                     rs.getBoolean("done"),
                     LocalDateTime.now()
@@ -44,6 +45,7 @@ class TodoRepository(private val dataSource: DataSource) {
         val todo = if (rs.next()) {
             Todo(
                 rs.getLong("id"),
+                rs.getLong("id"),
                 rs.getString("title"),
                 rs.getBoolean("done"),
                 LocalDateTime.now()
@@ -70,6 +72,7 @@ class TodoRepository(private val dataSource: DataSource) {
         rs.next()
 
         val todo = Todo(
+            rs.getLong("id"),
             rs.getLong("id"),
             rs.getString("title"),
             rs.getBoolean("done"),
@@ -101,6 +104,7 @@ class TodoRepository(private val dataSource: DataSource) {
         rs.next()
 
         val todo = Todo(
+            rs.getLong("id"),
             rs.getLong("id"),
             rs.getString("title"),
             rs.getBoolean("done"),

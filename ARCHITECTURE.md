@@ -1,0 +1,396 @@
+# Arquitetura da Aplicação - Taskly API
+
+## 📐 Visão Geral
+
+Esta aplicação segue os princípios de **DDD (Domain-Driven Design)** com uma arquitetura em camadas.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CLIENTE (Frontend)                        │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            │ HTTP/REST + JWT
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│              PRESENTATION LAYER (Controllers)                │
+│  ┌──────────────────┐         ┌──────────────────┐         │
+│  │ AuthController   │         │  TodoController  │         │
+│  │  /auth/*         │         │   /todos/*       │         │
+│  └──────────────────┘         └──────────────────┘         │
+│                                                              │
+│  DTOs: AuthDto, TodoDto, ErrorDto                          │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            │ Domain Objects
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│           APPLICATION LAYER (Business Logic)                 │
+│  ┌──────────────────┐         ┌──────────────────┐         │
+│  │  AuthService     │         │  TodoService     │         │
+│  │  - login()       │         │  - create()      │         │
+│  │  - register()    │         │  - toggle()      │         │
+│  │  - refresh()     │         │  - delete()      │         │
+│  └──────────────────┘         └──────────────────┘         │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            │ Repository Interfaces
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│              DOMAIN LAYER (Core Business)                    │
+│                                                              │
+│  Entities:                                                   │
+│  ┌──────────┐  ┌──────────┐  ┌─────────────────┐          │
+│  │   User   │  │   Todo   │  │  RefreshToken   │          │
+│  │  - id    │  │  - id    │  │  - token        │          │
+│  │  - email │  │  - title │  │  - expiresAt    │          │
+│  │  - roles │  │  - done  │  │  - revoked      │          │
+│  └──────────┘  └──────────┘  └─────────────────┘          │
+│                                                              │
+│  Value Objects:                                              │
+│  ┌──────────┐                                               │
+│  │  Email   │  (validação imutável)                        │
+│  └──────────┘                                               │
+│                                                              │
+│  Repository Interfaces (Ports):                             │
+│  - UserRepository                                           │
+│  - TodoRepository                                           │
+│  - RefreshTokenRepository                                   │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            │ Implements
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│        INFRASTRUCTURE LAYER (Technical Details)              │
+│                                                              │
+│  Repository Implementations:                                │
+│  ┌────────────────────┐  ┌────────────────────┐           │
+│  │ JdbcUserRepository │  │ JdbcTodoRepository │           │
+│  │  - JDBC/SQL        │  │  - JDBC/SQL        │           │
+│  └────────────────────┘  └────────────────────┘           │
+│  ┌──────────────────────────┐                              │
+│  │ JdbcRefreshTokenRepo     │                              │
+│  └──────────────────────────┘                              │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            │ SQL Queries
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   DATABASE (PostgreSQL)                      │
+│  ┌──────────┐  ┌──────────┐  ┌─────────────────┐          │
+│  │  users   │  │  todos   │  │ refresh_tokens  │          │
+│  └──────────┘  └──────────┘  └─────────────────┘          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 🔒 Camada de Segurança (Cross-Cutting)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    SECURITY LAYER                            │
+│                                                              │
+│  ┌──────────────────┐  ┌──────────────────┐                │
+│  │  JwtProvider     │  │ PasswordHasher   │                │
+│  │  - generate()    │  │  - hash()        │                │
+│  │  - validate()    │  │  - verify()      │                │
+│  └──────────────────┘  └──────────────────┘                │
+│                                                              │
+│  ┌──────────────────┐  ┌──────────────────┐                │
+│  │ AuthMiddleware   │  │  RateLimiter     │                │
+│  │  - validate JWT  │  │  - limit by IP   │                │
+│  │  - check roles   │  │  - 100 req/min   │                │
+│  └──────────────────┘  └──────────────────┘                │
+│                                                              │
+│  ┌──────────────────┐  ┌──────────────────┐                │
+│  │  AuditLogger     │  │ RefreshTokenProv │                │
+│  │  - log events    │  │  - generate()    │                │
+│  └──────────────────┘  └──────────────────┘                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 🔄 Fluxo de Autenticação
+
+```
+┌─────────┐
+│ Cliente │
+└────┬────┘
+     │
+     │ 1. POST /auth/register
+     │    { email, password }
+     ▼
+┌─────────────────┐
+│ AuthController  │
+└────┬────────────┘
+     │
+     │ 2. Validar dados
+     ▼
+┌─────────────────┐
+│  AuthService    │
+└────┬────────────┘
+     │
+     │ 3. Hash password (BCrypt)
+     ▼
+┌─────────────────┐
+│ UserRepository  │──────► PostgreSQL (save user)
+└────┬────────────┘
+     │
+     │ 4. Return success
+     ▼
+┌─────────┐
+│ Cliente │◄─── 201 Created
+└─────────┘
+
+
+┌─────────┐
+│ Cliente │
+└────┬────┘
+     │
+     │ 1. POST /auth/login
+     │    { email, password }
+     ▼
+┌─────────────────┐
+│ AuthController  │
+└────┬────────────┘
+     │
+     │ 2. Find user
+     ▼
+┌─────────────────┐
+│  AuthService    │
+└────┬────────────┘
+     │
+     │ 3. Verify password
+     ▼
+┌──────────────────┐
+│  PasswordHasher  │ (BCrypt.verify)
+└────┬─────────────┘
+     │
+     │ 4. Generate tokens
+     ▼
+┌──────────────────┐        ┌──────────────────────┐
+│   JwtProvider    │        │ RefreshTokenProvider │
+│ (access token)   │        │  (refresh token)     │
+└────┬─────────────┘        └────┬─────────────────┘
+     │                            │
+     │ 5. Save refresh token      │
+     ▼                            ▼
+┌─────────────────────────────────────┐
+│     RefreshTokenRepository          │
+└────┬────────────────────────────────┘
+     │
+     │ 6. Return tokens
+     ▼
+┌─────────┐
+│ Cliente │◄─── { accessToken, refreshToken }
+└─────────┘
+```
+
+## 🔐 Fluxo de Requisição Autenticada
+
+```
+┌─────────┐
+│ Cliente │
+└────┬────┘
+     │
+     │ GET /api/v1/todos
+     │ Authorization: Bearer <JWT>
+     ▼
+┌──────────────────┐
+│  Rate Limiter    │ (100 req/min)
+└────┬─────────────┘
+     │
+     ▼
+┌──────────────────┐
+│ AuthMiddleware   │
+└────┬─────────────┘
+     │
+     │ Validate JWT
+     ▼
+┌──────────────────┐
+│   JwtProvider    │
+└────┬─────────────┘
+     │
+     │ Extract claims
+     │ (userId, email, roles)
+     ▼
+┌──────────────────┐
+│ TodoController   │
+└────┬─────────────┘
+     │
+     │ Get userId from context
+     ▼
+┌──────────────────┐
+│  TodoService     │
+└────┬─────────────┘
+     │
+     │ Find todos by userId
+     ▼
+┌──────────────────┐
+│ TodoRepository   │──────► PostgreSQL
+└────┬─────────────┘
+     │
+     │ Return todos
+     ▼
+┌─────────┐
+│ Cliente │◄─── [ { id, title, done }, ... ]
+└─────────┘
+```
+
+## 🏗️ Padrões de Design Utilizados
+
+### 1. Repository Pattern
+- **Objetivo**: Abstrair acesso a dados
+- **Implementação**: Interfaces no domain, implementações na infrastructure
+
+### 2. Dependency Injection
+- **Objetivo**: Inversão de controle
+- **Implementação**: Manual no Main.kt
+
+### 3. Value Object
+- **Objetivo**: Validação e imutabilidade
+- **Implementação**: Email com validação no construtor
+
+### 4. Strategy Pattern
+- **Objetivo**: Algoritmos intercambiáveis
+- **Implementação**: PasswordHasher (pode trocar BCrypt por Argon2)
+
+### 5. Chain of Responsibility
+- **Objetivo**: Pipeline de middlewares
+- **Implementação**: Javalin before() handlers (RateLimiter → AuthMiddleware)
+
+### 6. Factory Pattern
+- **Objetivo**: Criação de objetos complexos
+- **Implementação**: JwtProvider.generateToken(), RefreshTokenProvider.generate()
+
+## 📊 Diagrama de Classes (Simplificado)
+
+```
+┌──────────────────┐
+│      User        │
+├──────────────────┤
+│ - id: Long       │
+│ - email: Email   │
+│ - passwordHash   │
+│ - roles: Set     │
+│ - active: Boolean│
+├──────────────────┤
+│ + hasRole()      │
+│ + isAdmin()      │
+└──────────────────┘
+         △
+         │ owns
+         │
+    ┌────┴─────┐
+    │          │
+┌───▼──────┐   │
+│   Todo   │   │
+├──────────┤   │
+│ - userId │   │
+│ - title  │   │
+│ - done   │   │
+├──────────┤   │
+│ +toggle()│   │
+└──────────┘   │
+               │
+    ┌──────────▼──────────┐
+    │   RefreshToken      │
+    ├─────────────────────┤
+    │ - userId            │
+    │ - token             │
+    │ - expiresAt         │
+    │ - revoked           │
+    ├─────────────────────┤
+    │ + isValid()         │
+    │ + revoke()          │
+    └─────────────────────┘
+```
+
+## 🔀 Fluxo de Dados (Data Flow)
+
+```
+HTTP Request
+    │
+    ▼
+[Rate Limiter] ─── bloqueio ──► 429 Too Many Requests
+    │
+    │ passou
+    ▼
+[AuthMiddleware] ─── sem token ──► 401 Unauthorized
+    │                invalid token
+    │ válido
+    ▼
+[Controller] ─── validação ──► 400 Bad Request
+    │
+    │ ok
+    ▼
+[Service] ─── business rule ──► 403 Forbidden
+    │                            404 Not Found
+    │ ok
+    ▼
+[Repository]
+    │
+    ▼
+[Database] ─── SQL error ──► 500 Internal Error
+    │
+    │ ok
+    ▼
+Response ──► 200/201/204
+```
+
+## 🎯 Princípios SOLID Aplicados
+
+### Single Responsibility
+- ✅ `AuthController`: apenas HTTP handling
+- ✅ `AuthService`: apenas lógica de negócio
+- ✅ `JdbcUserRepository`: apenas persistência
+
+### Open/Closed
+- ✅ Repositories: abertos para extensão (novas implementações)
+- ✅ Fechados para modificação (interfaces estáveis)
+
+### Liskov Substitution
+- ✅ Qualquer implementação de `UserRepository` pode substituir outra
+
+### Interface Segregation
+- ✅ Interfaces pequenas e focadas (UserRepository, TodoRepository)
+
+### Dependency Inversion
+- ✅ Services dependem de interfaces, não implementações
+- ✅ Domain não depende de Infrastructure
+
+## 🚀 Escalabilidade
+
+### Horizontal Scaling
+```
+┌──────────┐     ┌──────────┐     ┌──────────┐
+│ Instance │     │ Instance │     │ Instance │
+│    1     │     │    2     │     │    3     │
+└─────┬────┘     └─────┬────┘     └─────┬────┘
+      │                │                │
+      └────────────────┼────────────────┘
+                       │
+                  ┌────▼────┐
+                  │   LB    │ (Load Balancer)
+                  └────┬────┘
+                       │
+              ┌────────┴────────┐
+              │                 │
+         ┌────▼────┐      ┌────▼─────┐
+         │  Cache  │      │ Database │
+         │ (Redis) │      │  (PG)    │
+         └─────────┘      └──────────┘
+```
+
+**Stateless Design:**
+- ✅ JWT (sem sessões)
+- ✅ Refresh tokens no banco (compartilhado)
+- ✅ Sem estado na aplicação
+
+### Otimizações Futuras
+1. **Cache Layer**: Redis para refresh tokens
+2. **Read Replicas**: PostgreSQL replicas para leituras
+3. **Connection Pooling**: HikariCP já implementado
+4. **CDN**: Servir assets estáticos
+5. **Message Queue**: Eventos assíncronos (email, notifications)
+
+---
+
+**Arquitetura pronta para produção! 🚀**

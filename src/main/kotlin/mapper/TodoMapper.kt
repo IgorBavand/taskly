@@ -1,7 +1,7 @@
 package app.mapper
 
-import app.model.Todo
-import app.dto.TodoResponse
+import app.domain.entity.Todo
+import app.presentation.dto.TodoResponse
 
 object TodoMapper {
 
@@ -10,7 +10,8 @@ object TodoMapper {
             id = todo.id,
             title = todo.title,
             done = todo.done,
-            createdAt = todo.createdAt
+            createdAt = todo.createdAt,
+            updatedAt = todo.updatedAt
         )
     }
 }
