@@ -29,7 +29,10 @@ class UserEntity(
     var roles: String = "USER",
 
     @Column(name = "active", nullable = false)
-    var active: Boolean = true
+    var active: Boolean = true,
+
+    @Column(name = "face_embedding", nullable = true, columnDefinition = "TEXT")
+    var faceEmbedding: String? = null
 
 ) : BaseEntity() {
 
@@ -43,6 +46,7 @@ class UserEntity(
             passwordHash = this.passwordHash,
             roles = parseRoles(this.roles),
             active = this.active,
+            faceEmbedding = this.faceEmbedding,
             createdAt = this.createdAt,
             updatedAt = this.updatedAt
         )
@@ -58,7 +62,8 @@ class UserEntity(
                 email = user.email.value,
                 passwordHash = user.passwordHash,
                 roles = formatRoles(user.roles),
-                active = user.active
+                active = user.active,
+                faceEmbedding = user.faceEmbedding
             ).also {
                 it.createdAt = user.createdAt
                 it.updatedAt = user.updatedAt

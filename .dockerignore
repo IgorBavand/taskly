@@ -1,0 +1,34 @@
+# Maven
+target/
+!target/*.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# DeepFace service (não necessário no build do backend)
+deepface-service/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local

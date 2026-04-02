@@ -8,6 +8,7 @@ API REST moderna e segura para gerenciamento de tarefas, construída com Kotlin,
 - ✅ Autenticação JWT com Refresh Tokens
 - ✅ RBAC (Role-Based Access Control)
 - ✅ CRUD completo de tarefas
+- ✅ **Validação Facial com DeepFace** (opcional para criação de tarefas)
 - ✅ Rate Limiting
 - ✅ Auditoria de segurança
 - ✅ Isolamento de dados por usuário
@@ -36,12 +37,13 @@ API REST moderna e segura para gerenciamento de tarefas, construída com Kotlin,
 src/main/kotlin/
 ├── config/                    # Configurações (Javalin, Database, Env)
 ├── domain/
-│   ├── entity/               # Entidades de domínio (User, Todo, RefreshToken)
+│   ├── entity/               # Entidades de domínio (User, Todo, RefreshToken, FaceValidationToken)
 │   └── repository/           # Interfaces de repositórios
 ├── application/
-│   └── service/              # Lógica de negócio (AuthService, TodoService)
+│   └── service/              # Lógica de negócio (AuthService, TodoService, FaceValidationService)
 ├── infrastructure/
-│   └── repository/           # Implementações JDBC dos repositórios
+│   ├── repository/           # Implementações JPA dos repositórios
+│   └── external/             # Integração com serviços externos (DeepFaceService)
 ├── presentation/
 │   ├── controller/           # Controllers REST
 │   └── dto/                  # Data Transfer Objects
@@ -50,14 +52,23 @@ src/main/kotlin/
 
 src/main/resources/
 └── db/migration/             # Migrations Flyway
+
+deepface-service/             # Microserviço Python de reconhecimento facial
+├── app/
+│   └── main.py              # FastAPI app
+├── requirements.txt
+├── Dockerfile
+└── README.md
 ```
 
 ## 🚀 Início Rápido
 
 ### Pré-requisitos
-- Java 11+
+- Java 21+
 - Maven 3.6+
 - PostgreSQL 12+
+- Docker & Docker Compose (recomendado)
+- Python 3.11+ (se executar DeepFace localmente)
 
 ### 1. Clonar repositório
 ```bash
@@ -104,11 +115,83 @@ mvn clean install
 mvn exec:java
 ```
 
-A API estará disponível em: `http://localhost:7070`
+A API estará disponível em: `http://localhost:7171`
 
-## 📖 Documentação da API
+### 6. (Opcional) Executar com Docker Compose
 
-Veja [API.md](./API.md) para documentação completa dos endpoints.
+Para executar a stack completa (PostgreSQL + Backend + DeepFace Service):
+
+```bash
+# Configurar variáveis de ambiente
+cp .env.example .env
+nano .env  # Ajustar configurações
+
+# Iniciar todos os serviços
+docker-compose up -d
+
+# Verificar logs
+docker-compose logs -f
+
+# Parar serviços
+docker-compose down
+```
+
+Serviços disponíveis:
+- Backend API: `http://localhost:7171`
+- DeepFace Service: `http://localhost:8080`
+- PostgreSQL: `localhost:5432`
+
+## 📖 Documentação
+
+- **[API.md](./API.md)** - Documentação completa dos endpoints (se disponível)
+- **[DEEPFACE_MIGRATION.md](./DEEPFACE_MIGRATION.md)** - Guia de migração CompreFace → DeepFace
+- **[deepface-service/README.md](./deepface-service/README.md)** - Documentação do serviço DeepFace
+
+## 🎭 Validação Facial
+
+Este projeto inclui validação facial opcional usando DeepFace.
+
+### Como funciona
+
+1. **Registro de Face** (primeira vez):
+   ```bash
+   POST /api/v1/face/register
+   ```
+   - Frontend captura foto do usuário
+   - Backend extrai embedding (vetor de 512 dimensões)
+   - Embedding é armazenado no banco (não a imagem)
+
+2. **Validação Facial** (antes de criar tarefa):
+   ```bash
+   POST /api/v1/face/verify
+   ```
+   - Frontend captura foto novamente
+   - Backend compara com embedding armazenado
+   - Se verificado, emite token válido por 2 minutos
+
+3. **Criar Tarefa** (com validação):
+   ```bash
+   POST /api/v1/todos
+   Headers: { "X-Face-Validation-Token": "abc123" }
+   ```
+   - Middleware valida token facial
+   - Se válido, permite criação da tarefa
+
+### Vantagens
+
+- **Privacidade**: Armazena apenas embeddings (vetores), não fotos
+- **Performance**: Verificação em ~50ms
+- **Compatibilidade**: Roda nativamente em Apple Silicon (ARM64)
+- **Segurança**: Tokens expiram em 2 minutos
+- **LGPD/GDPR**: Embeddings não permitem reconstrução da face
+
+### Configuração
+
+Veja [DEEPFACE_MIGRATION.md](./DEEPFACE_MIGRATION.md) para:
+- Setup do DeepFace service
+- Ajuste de thresholds
+- Troubleshooting
+- Comparação de modelos
 
 ### Exemplo rápido
 
@@ -208,6 +291,8 @@ Os logs de segurança são registrados com o prefixo `[AUDIT]`:
 | `REFRESH_TOKEN_EXPIRATION_DAYS` | Não | 30 | Expiração do refresh token (dias) |
 | `BCRYPT_ROUNDS` | Não | 12 | Custo do BCrypt |
 | `ALLOWED_ORIGINS` | Não | http://localhost:3000 | Origens CORS permitidas |
+| `DEEPFACE_URL` | Não | http://localhost:8080 | URL do serviço DeepFace |
+| `DEEPFACE_THRESHOLD` | Não | 0.4 | Threshold de verificação facial |
 
 ## 🚢 Deploy
 
@@ -238,15 +323,25 @@ java -jar target/Taskly-1.0-SNAPSHOT.jar
 
 ## 🛠️ Tecnologias
 
+### Backend (Kotlin)
 - **Kotlin** 1.9.22 - Linguagem
 - **Javalin** 5.6.1 - Framework web
 - **PostgreSQL** 42.7.3 - Banco de dados
+- **Hibernate/JPA** 6.4.4 - ORM
 - **Flyway** 9.22.3 - Migrations
 - **HikariCP** 5.1.0 - Connection pooling
 - **JWT** (auth0) 4.4.0 - Autenticação
 - **BCrypt** 0.4 - Hash de senhas
 - **Jackson** 2.15.2 - JSON serialization
+- **OkHttp** 4.12.0 - HTTP client
 - **SLF4J** 2.0.9 - Logging
+
+### Face Recognition (Python)
+- **DeepFace** 0.0.93 - Framework de reconhecimento facial
+- **FastAPI** 0.115.0 - API web framework
+- **TensorFlow** 2.18.0 - Machine Learning (compatível ARM64)
+- **OpenCV** 4.10.0 - Processamento de imagem
+- **Facenet512** - Modelo de reconhecimento (padrão)
 
 ## 🤝 Contribuindo
 

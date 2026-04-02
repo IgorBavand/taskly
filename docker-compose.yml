@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (Taskly Application)
+  postgres:
+    image: postgres:14-alpine
+    container_name: taskly-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: taskly
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - taskly-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # DeepFace Service (Python/FastAPI)
+  deepface-service:
+    build:
+      context: ./deepface-service
+      dockerfile: Dockerfile
+    container_name: taskly-deepface
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Model configuration
+      DEEPFACE_MODEL_NAME: Facenet512
+      DEEPFACE_DISTANCE_METRIC: cosine
+      DEEPFACE_DETECTOR_BACKEND: opencv
+      DEEPFACE_VERIFICATION_THRESHOLD: "0.4"
+      # Server configuration
+      PORT: "8080"
+      WORKERS: "1"
+    networks:
+      - taskly-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  # Taskly Backend (Kotlin/Javalin)
+  taskly-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskly-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      deepface-service:
+        condition: service_healthy
+    ports:
+      - "7171:7171"
+    environment:
+      # Database
+      DATABASE_URL: jdbc:postgresql://postgres:5432/taskly
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      JWT_ISSUER: taskly-api
+      JWT_EXPIRATION_MS: "3600000"
+      REFRESH_TOKEN_EXPIRATION_DAYS: "30"
+      # Server
+      SERVER_PORT: "7171"
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      # Security
+      BCRYPT_ROUNDS: "12"
+      # CORS
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:4200,http://localhost:3000}
+      # DeepFace integration
+      DEEPFACE_URL: http://deepface-service:8080
+      DEEPFACE_THRESHOLD: "0.4"
+    networks:
+      - taskly-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7171/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+
+volumes:
+  postgres-data:
+    driver: local
+
+networks:
+  taskly-network:
+    driver: bridge

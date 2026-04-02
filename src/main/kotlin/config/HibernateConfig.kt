@@ -99,7 +99,8 @@ object HibernateConfig {
                 managedClassNames = listOf(
                     "app.infrastructure.persistence.entity.UserEntity",
                     "app.infrastructure.persistence.entity.TodoEntity",
-                    "app.infrastructure.persistence.entity.RefreshTokenEntity"
+                    "app.infrastructure.persistence.entity.RefreshTokenEntity",
+                    "app.infrastructure.persistence.entity.FaceValidationTokenEntity"
                 ),
                 properties = properties
             ),

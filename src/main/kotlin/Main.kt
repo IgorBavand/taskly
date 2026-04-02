@@ -6,16 +6,21 @@ import app.config.HibernateConfig
 import app.config.JavalinConfig
 import app.presentation.controller.AuthController
 import app.presentation.controller.TodoController
+import app.presentation.controller.FaceController
 import app.presentation.exception.GlobalExceptionHandler
 import app.infrastructure.persistence.TransactionManager
 import app.infrastructure.persistence.repository.JpaUserRepository
 import app.infrastructure.persistence.repository.JpaTodoRepository
 import app.infrastructure.persistence.repository.JpaRefreshTokenRepository
+import app.infrastructure.persistence.repository.JpaFaceValidationTokenRepository
+import app.infrastructure.external.DeepFaceService
 import app.application.service.AuthService
 import app.application.service.TodoService
+import app.application.service.FaceValidationService
 import app.security.AuthMiddleware
 import app.security.AuthRateLimiter
 import app.security.RateLimiter
+import app.security.FaceValidationMiddleware
 import org.slf4j.LoggerFactory
 
 /**
@@ -44,14 +49,27 @@ fun main() {
     val userRepository = JpaUserRepository(transactionManager)
     val todoRepository = JpaTodoRepository(transactionManager)
     val refreshTokenRepository = JpaRefreshTokenRepository(transactionManager)
+    val faceValidationTokenRepository = JpaFaceValidationTokenRepository(transactionManager)
+
+    // Serviços externos
+    val deepFaceService = DeepFaceService()
 
     // Camada de aplicação
     val authService = AuthService(userRepository, refreshTokenRepository)
     val todoService = TodoService(todoRepository)
+    val faceValidationService = FaceValidationService(
+        deepFaceService,
+        faceValidationTokenRepository,
+        userRepository
+    )
 
     // Camada de apresentação
     val authController = AuthController(authService)
     val todoController = TodoController(todoService)
+    val faceController = FaceController(faceValidationService)
+
+    // Middlewares
+    val faceValidationMiddleware = FaceValidationMiddleware(faceValidationService)
 
     // Configuração do Javalin
     val app = JavalinConfig.create()
@@ -68,10 +86,18 @@ fun main() {
 
     // Rotas que requerem autenticação
     app.before("/api/v1/auth/logout", AuthMiddleware())
+    app.before("/api/v1/todos*", AuthMiddleware())
+    app.before("/api/v1/face*", AuthMiddleware())
+
+    // Validação facial obrigatória para criar todos (apenas POST)
+    // ⚠️ TEMPORARIAMENTE DESABILITADO - aguardando testes do DeepFace service
+    // Descomentar após verificar que o serviço DeepFace está rodando
+    // app.before("/api/v1/todos", faceValidationMiddleware)
 
     // Registrar controllers
     authController.register(app)
     todoController.register(app)
+    faceController.register(app)
 
     // Rota de health check
     app.get("/health") { ctx ->

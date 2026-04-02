@@ -12,6 +12,7 @@ data class User(
     val passwordHash: String,
     val roles: Set<Role> = setOf(Role.USER),
     val active: Boolean = true,
+    val faceEmbedding: String? = null,  // Embedding facial (vetor como string CSV)
     val createdAt: LocalDateTime = LocalDateTime.now(),
     val updatedAt: LocalDateTime = LocalDateTime.now()
 ) {

@@ -25,7 +25,7 @@ abstract class NotFoundException(
 /**
  * Exceção base para acesso negado (403)
  */
-abstract class AccessDeniedException(
+open class AccessDeniedException(
     message: String,
     cause: Throwable? = null
 ) : DomainException(message, cause)
@@ -33,7 +33,7 @@ abstract class AccessDeniedException(
 /**
  * Exceção base para dados inválidos (400)
  */
-abstract class ValidationException(
+open class ValidationException(
     message: String,
     cause: Throwable? = null
 ) : DomainException(message, cause)

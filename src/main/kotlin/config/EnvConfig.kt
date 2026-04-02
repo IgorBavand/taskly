@@ -18,7 +18,7 @@ object EnvConfig {
     val REFRESH_TOKEN_EXPIRATION_DAYS: Long = getEnv("REFRESH_TOKEN_EXPIRATION_DAYS", "30").toLong()
 
     // Server
-    val SERVER_PORT: Int = getEnv("SERVER_PORT", "7171").toInt()
+    val SERVER_PORT: Int = getEnv("SERVER_PORT", "7272").toInt()
     val ENVIRONMENT: String = getEnv("ENVIRONMENT", "development") // development, production
 
     // Security
@@ -31,6 +31,14 @@ object EnvConfig {
     val ALLOWED_ORIGINS: List<String> = getEnv("ALLOWED_ORIGINS", "http://localhost:3000")
         .split(",")
         .map { it.trim() }
+
+    // DeepFace (Face Recognition) - Substitui CompreFace
+    val DEEPFACE_URL: String = getEnv("DEEPFACE_URL", "http://localhost:8080")
+    val DEEPFACE_THRESHOLD: Double = getEnv("DEEPFACE_THRESHOLD", "0.4").toDouble()
+
+    // CompreFace (DEPRECATED - manter para compatibilidade)
+    val COMPREFACE_URL: String = getEnv("COMPREFACE_URL", "http://localhost:8000")
+    val COMPREFACE_API_KEY: String = getEnv("COMPREFACE_API_KEY", "00000000-0000-0000-0000-000000000000")
 
     private fun getEnv(key: String, default: String): String {
         return System.getenv(key) ?: default
